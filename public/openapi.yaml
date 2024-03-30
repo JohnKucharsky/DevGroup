@@ -1,0 +1,391 @@
+openapi: 3.0.3
+info:
+  title: DVD Rental API
+  description: DVD Rental dataset API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+tags:
+  - name: Authorization
+  - name: News
+paths:
+  /auth/sign-up:
+    post:
+      tags:
+        - Authorization
+      summary: Register
+      operationId: SignUp
+      requestBody:
+        $ref: '#/components/requestBodies/SignUpInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/User'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+      x-codegen-request-body-name: body
+  /auth/login:
+    post:
+      tags:
+        - Authorization
+      summary: Login
+      description: Sign in to the app. Returns cookies, access_token, refresh_token, logged_in
+      operationId: SignIn
+      requestBody:
+        $ref: '#/components/requestBodies/SignInInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/LoginRes'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+      x-codegen-request-body-name: body
+  /auth/logout:
+    get:
+      tags:
+        - Authorization
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      summary: Logout
+      description: Destroys all cookies, finishes local session, saved on the server
+      operationId: Logout
+      responses:
+        '201':
+          $ref: '#/components/responses/EmptyOkResponse'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/GenericError'
+  /auth/refresh:
+    get:
+      tags:
+        - Authorization
+      security:
+        - refresh_token: [ ]
+      summary: Refresh token
+      description: Sets new access_token and logged_in(HTTPOnly:false). refresh_token stays the same until expires
+      operationId: RefreshToken
+      responses:
+        '201':
+          $ref: '#/components/responses/AccessToken'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/GenericError'
+  /auth/me:
+    get:
+      tags:
+        - Authorization
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      summary: Get me
+      description: Get info about currently authorized user
+      operationId: GetMe
+      responses:
+        '200':
+          $ref: '#/components/responses/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/GenericError'
+  /actor:
+    post:
+      tags:
+        - Actor
+      summary: Create an actor
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      operationId: ActorPost
+      requestBody:
+        $ref: '#/components/requestBodies/ActorInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/OneActor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+      x-codegen-request-body-name: body
+    get:
+      tags:
+        - Actor
+      summary: Get all actors
+      operationId: GetManyActors
+      responses:
+        '200':
+          $ref: '#/components/responses/ManyActors'
+        '400':
+          $ref: '#/components/responses/GenericError'
+  /actor/{id}:
+    get:
+      tags:
+        - Actor
+      description: Get actor by id
+      operationId: GetOneActor
+      responses:
+        '200':
+          $ref: '#/components/responses/OneActor'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+    put:
+      tags:
+        - Actor
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      description: Update actor
+      operationId: UpdateActor
+      requestBody:
+        $ref: '#/components/requestBodies/ActorInput'
+      responses:
+        '201':
+          $ref: '#/components/responses/OneActor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+    delete:
+      tags:
+        - Actor
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      description: Delete an actor
+      operationId: DeleteActor
+      responses:
+        '200':
+          $ref: '#/components/responses/OneActor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+components:
+  securitySchemes:
+    access_token:
+      description: |
+        You have to have access token in access token cookie to authorize request
+      type: apiKey
+      name: access_token
+      in: cookie
+    refresh_token:
+      description: |
+        Refresh token is used to gain new access token
+      type: apiKey
+      name: refresh_token
+      in: cookie
+    Authorization:
+      type: apiKey
+      name: Authorization
+      in: header
+      description: |
+        Prefix the value with "Authorization" to indicate the custom authorization type
+  responses:
+    ManyActors:
+      description: Actors array
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Actor'
+    OneActor:
+      description: One Actor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Actor'
+    User:
+      description: User
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+    LoginRes:
+      description: User, access token, refresh_token, logged_in
+      headers:
+        Set-Cookie:
+          schema:
+            type: string
+            example: access_token httponly, refresh_token httponly, logged_in boolean
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              access_token:
+                type: string
+              user:
+                $ref: '#/components/schemas/User'
+    AccessToken:
+      description: Access token
+      headers:
+        Set-Cookie:
+          schema:
+            type: string
+            example: access_token httponly, logged_in boolean
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              access_token:
+                type: string
+                example: secureToken
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: no access token
+    GenericError:
+      description: String error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: something went wrong
+    EmptyOkResponse:
+      description: No content
+      content:
+        text/html:
+          schema:
+            type: string
+  requestBodies:
+    ActorInput:
+      required: true
+      description: Create and update actor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ActorInput'
+    SignUpInput:
+      required: true
+      description: Register a user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SignUpInput'
+    SignInInput:
+      required: true
+      description: Login
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SignInInput'
+  schemas:
+    Actor:
+      required:
+        - id
+        - first_name
+        - last_name
+        - updated_at
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Travolta
+        updated_at:
+          type: string
+          format: date-time
+          example: 01.02.2024
+    ActorInput:
+      required:
+        - first_name
+        - last_name
+      type: object
+      properties:
+        first_name:
+          type: string
+          example: Jim
+        last_name:
+          type: string
+          example: Carey
+    User:
+      required:
+        - id
+        - name
+        - email
+        - updated_at
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: John
+        email:
+          type: string
+          example: john@mail.com
+        updated_at:
+          type: string
+          format: date-time
+          example: 02.03.2020
+    SignUpInput:
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          example: Me
+        email:
+          type: string
+          example: me@mail.com
+        password:
+          type: string
+          minLength: '8'
+          example: kkkkkkkk
+    SignInInput:
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          example: me@mail.com
+        password:
+          type: string
+          minLength: '8'
+          example: kkkkkkkk
