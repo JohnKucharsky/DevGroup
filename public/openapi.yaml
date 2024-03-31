@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: DVD Rental API
-  description: DVD Rental dataset API
+  title: News API with auth
+  description: DevGroup test
   version: 1.0.0
 servers:
   - url: http://localhost:8080/api
@@ -100,20 +100,41 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/GenericError'
-  /actor:
-    post:
+  /list:
+    get:
       tags:
-        - Actor
-      summary: Create an actor
+        - News
+      summary: Get all news
       security:
         - access_token: [ ]
         - Authorization: [ ]
-      operationId: ActorPost
+      operationId: NewsList
+      parameters:
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/ManyNews'
+        '400':
+          $ref: '#/components/responses/GenericError'
+        '422':
+          $ref: '#/components/responses/GenericError'
+      x-codegen-request-body-name: body
+  /add:
+    post:
+      tags:
+        - News
+      summary: Add news
+      description: Add new news
+      security:
+        - access_token: [ ]
+        - Authorization: [ ]
+      operationId: GetManyNews
       requestBody:
-        $ref: '#/components/requestBodies/ActorInput'
+        $ref: '#/components/requestBodies/CreateNewsInput'
       responses:
         '201':
-          $ref: '#/components/responses/OneActor'
+          $ref: '#/components/responses/OneNews'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '400':
@@ -121,59 +142,21 @@ paths:
         '422':
           $ref: '#/components/responses/GenericError'
       x-codegen-request-body-name: body
-    get:
-      tags:
-        - Actor
-      summary: Get all actors
-      operationId: GetManyActors
-      responses:
-        '200':
-          $ref: '#/components/responses/ManyActors'
-        '400':
-          $ref: '#/components/responses/GenericError'
-  /actor/{id}:
-    get:
-      tags:
-        - Actor
-      description: Get actor by id
-      operationId: GetOneActor
-      responses:
-        '200':
-          $ref: '#/components/responses/OneActor'
-        '400':
-          $ref: '#/components/responses/GenericError'
-        '422':
-          $ref: '#/components/responses/GenericError'
+  /edit/{id}:
     put:
       tags:
-        - Actor
+        - News
       security:
         - access_token: [ ]
         - Authorization: [ ]
-      description: Update actor
-      operationId: UpdateActor
+      summary: Update news
+      description: Update existing news
+      operationId: UpdateNews
       requestBody:
-        $ref: '#/components/requestBodies/ActorInput'
+        $ref: '#/components/requestBodies/UpdateNewsInput'
       responses:
         '201':
-          $ref: '#/components/responses/OneActor'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '400':
-          $ref: '#/components/responses/GenericError'
-        '422':
-          $ref: '#/components/responses/GenericError'
-    delete:
-      tags:
-        - Actor
-      security:
-        - access_token: [ ]
-        - Authorization: [ ]
-      description: Delete an actor
-      operationId: DeleteActor
-      responses:
-        '200':
-          $ref: '#/components/responses/OneActor'
+          $ref: '#/components/responses/OneNews'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '400':
@@ -181,6 +164,26 @@ paths:
         '422':
           $ref: '#/components/responses/GenericError'
 components:
+  parameters:
+    offsetParam:
+      in: query
+      name: offset
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 0
+        example: 10
+      description: The number of items to skip before starting to collect the result set
+    limitParam:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 20
+      description: The numbers of items to return.
   securitySchemes:
     access_token:
       description: |
@@ -201,26 +204,40 @@ components:
       description: |
         Prefix the value with "Authorization" to indicate the custom authorization type
   responses:
-    ManyActors:
+    ManyNews:
       description: Actors array
       content:
         application/json:
           schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/Actor'
-    OneActor:
-      description: One Actor
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/News'
+              pagination:
+                $ref: '#/components/schemas/Pagination'
+    OneNews:
+      description: One news
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Actor'
+            $ref: '#/components/schemas/News'
     User:
       description: User
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/User'
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              data:
+                $ref: '#/components/schemas/User'
     LoginRes:
       description: User, access token, refresh_token, logged_in
       headers:
@@ -285,13 +302,20 @@ components:
           schema:
             type: string
   requestBodies:
-    ActorInput:
+    CreateNewsInput:
       required: true
-      description: Create and update actor
+      description: Create news
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ActorInput'
+            $ref: '#/components/schemas/CreateNewsInput'
+    UpdateNewsInput:
+      required: true
+      description: Update news
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateNewsInput'
     SignUpInput:
       required: true
       description: Register a user
@@ -307,39 +331,79 @@ components:
           schema:
             $ref: '#/components/schemas/SignInInput'
   schemas:
-    Actor:
+    Pagination:
+      required:
+        - total
+        - limit
+        - offset
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 25
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+    News:
       required:
         - id
-        - first_name
-        - last_name
+        - title
+        - content
         - updated_at
       type: object
       properties:
         id:
           type: integer
           example: 1
-        first_name:
+        title:
           type: string
-          example: John
-        last_name:
+          example: New Toyota Avalon
+        content:
           type: string
-          example: Travolta
+          example:  Toyota Avalon starts at $37,920 and goes up to $45,245 depending on the trim and options
+        categories:
+          type: array
+          items:
+            type: integer
+          example: [1, 2, 3]
         updated_at:
           type: string
           format: date-time
           example: 01.02.2024
-    ActorInput:
+    CreateNewsInput:
       required:
-        - first_name
-        - last_name
+        - title
+        - content
       type: object
       properties:
-        first_name:
+        title:
           type: string
-          example: Jim
-        last_name:
+          example: Russia
+        content:
           type: string
-          example: Carey
+          example: Various content about Russia
+        categories:
+          type: array
+          items:
+            type: integer
+          example: [ 1, 2, 3 ]
+    UpdateNewsInput:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Russia
+        content:
+          type: string
+          example: Various content about Russia
+        categories:
+          type: array
+          items:
+            type: integer
+          example: [ 1, 2, 3 ]
     User:
       required:
         - id

@@ -50,6 +50,38 @@ func (ns *NewsStore) BulkInsertCategories(newsID int, categories []int) error {
 	return nil
 }
 
+func (ns *NewsStore) BulkUpdateCategories(newsID int, categories []int) error {
+	ctx := context.Background()
+
+	params := pgx.NamedArgs{
+		"news_id": newsID,
+	}
+
+	fields := []string{"news_id"}
+
+	for idx, category := range categories {
+		catString := strconv.Itoa(category)
+		idxString := strconv.Itoa(idx)
+
+		fields = append(fields, idxString)
+		params[idxString] = catString
+	}
+
+	sql := fmt.Sprintf(`
+		insert into film (%s)
+		values (@%s)`,
+		strings.Join(fields, ", "),
+		strings.Join(fields, ", @"),
+	)
+
+	_, err := ns.db.Exec(ctx, sql, params)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (ns *NewsStore) GetCategoriesToNews(id int) ([]int, error) {
 	ctx := context.Background()
 
@@ -226,6 +258,12 @@ func (ns *NewsStore) Update(m domain.NewsInputUpdate, id int) (
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if m.Categories != nil {
+		if err := ns.BulkInsertCategories(res.ID, *m.Categories); err != nil {
+			return nil, err
+		}
 	}
 
 	ids, err := ns.GetCategoriesToNews(res.ID)

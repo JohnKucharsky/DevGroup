@@ -30,7 +30,7 @@ func Register(r *fiber.App, db *pgxpool.Pool, redis *redis.Client) {
 
 	// news
 	v1.Post("/add", h.DeserializeUser, h.CreateNews)
-	v1.Post("/edit/:id", h.DeserializeUser, h.UpdateNews)
+	v1.Put("/edit/:id", h.DeserializeUser, h.UpdateNews)
 	v1.Get("/list", h.DeserializeUser, h.GetManyNews)
 	// end news
 
