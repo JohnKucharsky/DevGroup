@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/JohnKucharsky/DevGroup/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/samber/lo"
 	"strconv"
 	"strings"
 )
@@ -20,21 +22,49 @@ func NewNewsStore(db *pgxpool.Pool) *NewsStore {
 	}
 }
 
+func (ns *NewsStore) BulkDeleteCategories(newsID int, categories []int) error {
+	ctx := context.Background()
+
+	createParams := pgx.NamedArgs{
+		"news_id": newsID,
+	}
+	var valuesStringArr []string
+
+	for idx, category := range categories {
+		catString := strconv.Itoa(category)
+		idxString := strconv.Itoa(idx + 1)
+
+		valuesStringArr = append(valuesStringArr, fmt.Sprintf("@%s", fmt.Sprintf("cat%s", idxString)))
+		createParams[fmt.Sprintf("cat%s", idxString)] = catString
+	}
+
+	sql := fmt.Sprintf(`
+		delete from news_categories where news_id = @news_id and
+		category_id in (%s) `, strings.Join(valuesStringArr, ", "),
+	)
+
+	_, err := ns.db.Exec(ctx, sql, createParams)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (ns *NewsStore) BulkInsertCategories(newsID int, categories []int) error {
 	ctx := context.Background()
 
 	createParams := pgx.NamedArgs{
 		"news_id": newsID,
 	}
-
 	var valuesStringArr []string
 
 	for idx, category := range categories {
 		catString := strconv.Itoa(category)
-		idxString := strconv.Itoa(idx)
+		idxString := strconv.Itoa(idx + 1)
 
-		valuesStringArr = append(valuesStringArr, fmt.Sprintf("(@news_id, @%d)", idx))
-		createParams[idxString] = catString
+		valuesStringArr = append(valuesStringArr, fmt.Sprintf("(@news_id, @%s)", fmt.Sprintf("cat%s", idxString)))
+		createParams[fmt.Sprintf("cat%s", idxString)] = catString
 	}
 
 	sql := fmt.Sprintf(`
@@ -53,30 +83,36 @@ func (ns *NewsStore) BulkInsertCategories(newsID int, categories []int) error {
 func (ns *NewsStore) BulkUpdateCategories(newsID int, categories []int) error {
 	ctx := context.Background()
 
-	params := pgx.NamedArgs{
-		"news_id": newsID,
-	}
-
-	fields := []string{"news_id"}
-
-	for idx, category := range categories {
-		catString := strconv.Itoa(category)
-		idxString := strconv.Itoa(idx)
-
-		fields = append(fields, idxString)
-		params[idxString] = catString
-	}
-
-	sql := fmt.Sprintf(`
-		insert into film (%s)
-		values (@%s)`,
-		strings.Join(fields, ", "),
-		strings.Join(fields, ", @"),
+	rows, err := ns.db.Query(
+		ctx, `select news_id, category_id from news_categories where news_id = @id`, pgx.NamedArgs{"id": newsID},
 	)
-
-	_, err := ns.db.Exec(ctx, sql, params)
 	if err != nil {
 		return err
+	}
+
+	resCategories, err := pgx.CollectRows(
+		rows, pgx.RowToAddrOfStructByName[domain.CategoryNewsDB],
+	)
+	if err != nil {
+		return err
+	}
+
+	var categoriesDbIDs []int
+	for _, cat := range resCategories {
+		categoriesDbIDs = append(categoriesDbIDs, cat.CategoryID)
+	}
+
+	categoriesToAdd, categoriesToDelete := lo.Difference(categories, categoriesDbIDs)
+	fmt.Println(categoriesToAdd, categoriesToDelete)
+	if len(categoriesToAdd) != 0 {
+		if err := ns.BulkInsertCategories(newsID, categoriesToAdd); err != nil {
+			return nil
+		}
+	}
+	if len(categoriesToDelete) != 0 {
+		if err := ns.BulkDeleteCategories(newsID, categoriesToDelete); err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -141,6 +177,9 @@ func (ns *NewsStore) Create(m domain.NewsInput) (
 	}
 
 	if m.Categories != nil {
+		if len(*m.Categories) == 0 {
+			return nil, errors.New("categories array is empty")
+		}
 		if err := ns.BulkInsertCategories(res.ID, *m.Categories); err != nil {
 			return nil, err
 		}
@@ -234,6 +273,10 @@ func (ns *NewsStore) Update(m domain.NewsInputUpdate, id int) (
 		params["content"] = *m.Content
 	}
 
+	if len(fields) == 0 {
+		return nil, errors.New("nothing to update")
+	}
+
 	sql := fmt.Sprintf(`
 		UPDATE news
 		SET %s
@@ -261,7 +304,7 @@ func (ns *NewsStore) Update(m domain.NewsInputUpdate, id int) (
 	}
 
 	if m.Categories != nil {
-		if err := ns.BulkInsertCategories(res.ID, *m.Categories); err != nil {
+		if err := ns.BulkUpdateCategories(res.ID, *m.Categories); err != nil {
 			return nil, err
 		}
 	}

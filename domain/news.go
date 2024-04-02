@@ -25,6 +25,11 @@ type NewsDB struct {
 	UpdatedAt time.Time `db:"updated_at"`
 }
 
+type CategoryNewsDB struct {
+	NewsID     int `db:"news_id"`
+	CategoryID int `db:"category_id"`
+}
+
 type NewsInput struct {
 	Title      string `json:"title" validate:"required"`
 	Content    string `json:"content" validate:"required"`
